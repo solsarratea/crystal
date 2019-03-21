@@ -5,16 +5,11 @@
 # In each level of the stack an amount of dummy objects are allocated.
 # These objects will be released by the GC eventually.
 
+require "option_parser"
+require "benchmark"
+
 lib LibC
   fun fflush(b : Void*)
-end
-
-def __p(s)
-  t = Thread.current.to_s rescue "Unknown"
-  f = Fiber.current.to_s rescue "Unknown"
-  LibC.printf("%s::%s >>> %s\n", t, f, s)
-  LibC.fflush(nil)
-  s
 end
 
 class Foo
@@ -36,7 +31,7 @@ class Context
   @worker_fibers = Array(Fiber).new(0)
   @pending_fibers = Array(Fiber).new(0)
 
-  def initialize(@fibers : Int32, @threads : Int32)
+  def initialize(@fibers : Int32, @threads : Int32, @log : Bool)
     @fibers_reached = Atomic(Int32).new(0)
     @fiber_depths = Array(Int32).new(@fibers, 0)
     @mutex = Thread::Mutex.new
@@ -88,7 +83,7 @@ class Context
 
   def run_until_depth(phase, depth)
     # make all fibers reach a specific depth
-    __p "#{phase}: expected_depth: #{depth}"
+    log "#{phase}: expected_depth: #{depth}"
 
     @expected_depth = depth
     @fibers_reached.set(0)
@@ -98,7 +93,7 @@ class Context
     # spin wait for all fibers to finish
     while @fibers_reached.get < @fibers
     end
-    __p "All fibers_reached!"
+    log "All fibers_reached!"
 
     @threads_state = :wait
   end
@@ -118,14 +113,14 @@ class Context
       fiber = @pending_fibers.shift?
     end
 
-    # __p "Picking #{fiber}"
+    # log "Picking #{fiber}"
 
     fiber.resume if fiber
   end
 
   def gc_stats
-    __p "GC.stats: #{GC.stats}"
-    __p "Foo.collections: #{Foo.collections}"
+    log "GC.stats: #{GC.stats}"
+    log "Foo.collections: #{Foo.collections}"
   end
 
   def create_thread
@@ -138,28 +133,70 @@ class Context
       end
     end
   end
+
+  def log(s)
+    if @log
+      t = Thread.current.to_s rescue "Unknown"
+      f = Fiber.current.to_s rescue "Unknown"
+      LibC.printf("%s::%s >>> %s\n", t, f, s)
+      LibC.fflush(nil)
+    end
+    s
+  end
 end
 
-# Specify the number of fibers and threads to use
-context = Context.new(fibers: 1_000, threads: 4)
+def run(threads_num, fibers_num, loops_num, log)
+  # Specify the number of fibers and threads to use
+  context = Context.new(fibers: fibers_num, threads: threads_num, log: log)
 
-(1..20).each do |i|
-  context.run_until_depth "Phase #{i}.1", 40
-  context.run_until_depth "Phase #{i}.2", 5
+  (1..loops_num).each do |i|
+    context.run_until_depth "Phase #{i}.1", 40
+    context.run_until_depth "Phase #{i}.2", 5
 
-  context.gc_stats
-  # GC.collect
-  # context.gc_stats
+    context.gc_stats
 
-  context.run_until_depth "Phase #{i}.3", 50
-  context.run_until_depth "Phase #{i}.4", 5
+    context.run_until_depth "Phase #{i}.3", 50
+    context.run_until_depth "Phase #{i}.4", 5
 
-  context.gc_stats
+    context.gc_stats
 
-  context.run_until_depth "Phase #{i}.5", 10
+    context.run_until_depth "Phase #{i}.5", 10
 
-  context.gc_stats
-  # GC.collect
-  # context.gc_stats
+    context.gc_stats
+  end
+
+  context.log "Done"
 end
-__p "Done"
+
+threads_num = 4
+fibers_num = 1_000
+loops_num = 20
+mode = :run
+
+OptionParser.parse! do |parser|
+  parser.on("-i", "--ips", "Benchmark with ips") { mode = :ips }
+  parser.on("-m", "--measure", "Benchmark with measure") { mode = :measure }
+  parser.on("-f FIBERS", "--fibers=FIBERS", "Specifies the number of fibers") { |v| fibers_num = v.to_i }
+  parser.on("-t THREADS", "--threads=THREADS", "Specifies the number of threads") { |v| threads_num = v.to_i }
+  parser.on("-l LOOPS", "--loops=LOOPS", "Specifies the number of loops") { |v| loops_num = v.to_i }
+  parser.on("-h", "--help", "Show this help") {
+    puts parser
+    exit(0)
+  }
+  parser.invalid_option do |flag|
+    STDERR.puts "ERROR: #{flag} is not a valid option."
+    STDERR.puts parser
+    exit(1)
+  end
+end
+
+case mode
+when :run
+  run(threads_num, fibers_num, loops_num, true)
+when :ips
+  Benchmark.ips do |x|
+    x.report("run") { run(threads_num, fibers_num, loops_num, false) }
+  end
+when :measure
+  puts Benchmark.measure { run(threads_num, fibers_num, loops_num, false) }
+end

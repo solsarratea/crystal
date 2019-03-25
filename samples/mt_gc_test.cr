@@ -29,12 +29,11 @@ end
 class Context
   property expected_depth : Int32 = 0
   @worker_fibers = Array(Fiber).new(0)
-  @pending_fibers = Array(Fiber).new(0)
 
   def initialize(@fibers : Int32, @threads : Int32, @log : Bool)
     @fibers_reached = Atomic(Int32).new(0)
     @fiber_depths = Array(Int32).new(@fibers, 0)
-    @mutex = Thread::Mutex.new
+    @pending_fibers_queues = Array(Array(Fiber)).new(@fibers) { Array(Fiber).new }
     @threads_state = :wait
 
     # Create worker fibers but do not start them yet.
@@ -50,7 +49,7 @@ class Context
     # they will perform operations when `@threads_state == :run`
     # otherwise they will remain in a tight busy loop.
     # See Context#create_thread
-    @threads.times { create_thread }
+    @threads.times { |index| create_thread(index) }
   end
 
   def self.fiber_run(context, fiber_index, depth)
@@ -87,7 +86,13 @@ class Context
 
     @expected_depth = depth
     @fibers_reached.set(0)
-    @pending_fibers = @worker_fibers.dup.shuffle!
+
+    # allocate fibers on each thread queue.
+    @pending_fibers_queues.each &.clear
+    @worker_fibers.dup.shuffle!.each_with_index do |f, index|
+      @pending_fibers_queues[index % @threads] << f
+    end
+
     @threads_state = :run
 
     # spin wait for all fibers to finish
@@ -106,15 +111,9 @@ class Context
     Thread.current.main_fiber.resume
   end
 
-  def pick_and_resume_fiber
-    fiber = nil
-
-    @mutex.synchronize do
-      fiber = @pending_fibers.shift?
-    end
-
+  def pick_and_resume_fiber(queue_index)
+    fiber = @pending_fibers_queues[queue_index].shift?
     # log "Picking #{fiber}"
-
     fiber.resume if fiber
   end
 
@@ -123,12 +122,12 @@ class Context
     log "Foo.collections: #{Foo.collections}"
   end
 
-  def create_thread
+  def create_thread(queue_index)
     Thread.new do
       while true
         case @threads_state
         when :run
-          pick_and_resume_fiber
+          pick_and_resume_fiber(queue_index)
         end
       end
     end

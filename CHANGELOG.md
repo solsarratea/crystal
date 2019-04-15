@@ -2,7 +2,7 @@
 
 ## Language changes
 
-- **(breaking-change)** Enum declaration members can no longer be separated by a comma, only by a newline or `;`. ([#7607](https://github.com/crystal-lang/crystal/pull/7607), [#7618](https://github.com/crystal-lang/crystal/pull/7618), thanks @asterite)
+- **(breaking-change)** Enum declaration members can no longer be separated by a space, only by a newline, `;` or `,`, the latter being deprecated and reformatted to a newline. ([#7607](https://github.com/crystal-lang/crystal/pull/7607), [#7618](https://github.com/crystal-lang/crystal/pull/7618), thanks @asterite, and @j8r)
 - Add begin-less and end-less ranges: `array[5..]`.  ([#7179](https://github.com/crystal-lang/crystal/pull/7179), thanks @asterite)
 - Add `offsetof(Type, @ivar)` expression. ([#7589](https://github.com/crystal-lang/crystal/pull/7589), thanks @malte-v)
 
@@ -99,7 +99,7 @@
 
 ### Concurrency
 
-- Add multi-threading ready GC when compiling with `-D preview_mt`. ([#7546](https://github.com/crystal-lang/crystal/pull/7546), thanks @bcardiff, and @ysbaddaden)
+- Add multi-threading ready GC when compiling with `-D preview_mt`. ([#7546](https://github.com/crystal-lang/crystal/pull/7546), thanks @bcardiff, @waj, and @ysbaddaden)
 - Ship patched bdw-gc for multi-threading support. ([#7622](https://github.com/crystal-lang/crystal/pull/7622), thanks @bcardiff, and @ysbaddaden)
 - Refactor to extract `Fiber::StackPool` from `Fiber`. ([#7417](https://github.com/crystal-lang/crystal/pull/7417), thanks @ysbaddaden)
 - Refactor `IO::Syscall` as `IO::Evented`. ([#7505](https://github.com/crystal-lang/crystal/pull/7505), thanks @ysbaddaden)
@@ -126,7 +126,7 @@
 - Improve error messages by adding the scope (and `with ... yield` scope, if any) on undefined method error. ([#7384](https://github.com/crystal-lang/crystal/pull/7384), thanks @asterite)
 - Suggest `next` when trying to break from captured block . ([#7406](https://github.com/crystal-lang/crystal/pull/7406), thanks @r00ster91)
 - Add detection of linux environment in compiler config. ([#7479](https://github.com/crystal-lang/crystal/pull/7479), thanks @straight-shoota)
-- Pending leftovers to support `//` and `&-ops` in multiple places. ([#7628](https://github.com/crystal-lang/crystal/pull/7628), thanks @bcardiff)
+- Pending leftovers to support `//` and `&`-ops in multiple places. ([#7628](https://github.com/crystal-lang/crystal/pull/7628), thanks @bcardiff)
 - Refactor `Crystal::Config.version` to use `read_file` macro. ([#7081](https://github.com/crystal-lang/crystal/pull/7081), thanks @Sija)
 - Rewrite macro spec without executing a shell command. ([#6962](https://github.com/crystal-lang/crystal/pull/6962), thanks @asterite)
 - Fix typo in internals. ([#7592](https://github.com/crystal-lang/crystal/pull/7592), thanks @toshokan)
